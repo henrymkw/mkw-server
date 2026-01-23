@@ -7,6 +7,11 @@ import (
 	"mkw-server/logging"
 )
 
+// WFCTalkerInterface allows Room/Player to interact with WFC without circular dependency
+type WFCTalkerInterface interface {
+	SendPacketDataToWFC(data []byte) error
+}
+
 type Room struct {
 	players map[string]*Player // key is player address string
 
@@ -93,13 +98,13 @@ func (r *Room) broadcastLoop() {
 	}
 }
 
-func (r *Room) AddPlayerToRoom(playerAddr string) bool {
+func (r *Room) AddPlayerToRoom(playerAddr string, wfcTalker WFCTalkerInterface) bool {
 	if _, exists := r.players[playerAddr]; exists {
 		logging.Log("Player %s already exists in room", playerAddr)
 		return false
 	}
 
-	player := NewPlayer(playerAddr, r)
+	player := NewPlayer(playerAddr, r, wfcTalker)
 	if player == nil {
 		logging.Log("Failed to create player %s", playerAddr)
 		return false

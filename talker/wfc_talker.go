@@ -86,7 +86,7 @@ func (wt *WFCTalker) HandleJoinRoomRequest(addr string) {
 		return
 	}
 
-	addPlayerResult := wt.roomPointer.AddPlayerToRoom(addr)
+	addPlayerResult := wt.roomPointer.AddPlayerToRoom(addr, wt)
 	if !addPlayerResult {
 		logging.Log("Failed to add player from WFC Join Friend Request")
 		return
@@ -130,6 +130,16 @@ func (wt *WFCTalker) SendMessageToWFC(message string) error {
 	_, err := wt.conn.Write([]byte(message))
 	logging.Log("Sent to WFC: %s", message)
 	return err
+}
+
+func (wt *WFCTalker) SendPacketDataToWFC(data []byte) error {
+	_, err := wt.conn.Write(data)
+	if err != nil {
+		logging.Log("Failed to send packet data to WFC: %v", err)
+		return err
+	}
+	logging.Log("Sent %d bytes of packet data to WFC", len(data))
+	return nil
 }
 
 func (wt *WFCTalker) Close() {
