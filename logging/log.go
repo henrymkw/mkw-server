@@ -10,6 +10,7 @@ import (
 
 var LogFile *os.File
 
+// log files are grouped up by the data in logs
 func InitLogFile() {
 	// Use os.Executable() to get the canotical path of the logs directory
 	// relative paths are unreliable when the working directory is different
@@ -26,8 +27,17 @@ func InitLogFile() {
 	exeDir := filepath.Dir(exePath)
 	logDir := filepath.Join(exeDir, "logs")
 
-	t := time.Now().Format("2006-01-02_15-04-05")
-	path := filepath.Join(logDir, t+".log")
+	now := time.Now()
+	dateFolder := now.Format("01-02-2006")
+	dateLogDir := filepath.Join(logDir, dateFolder)
+
+	err = os.MkdirAll(dateLogDir, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	timeStamp := now.Format("2006-01-02_15-04-05")
+	path := filepath.Join(dateLogDir, timeStamp+".log")
 
 	f, err := os.Create(path)
 	if err != nil {

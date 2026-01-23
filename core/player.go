@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"time"
 
 	"mkw-server/logging"
 )
@@ -37,6 +38,7 @@ func NewPlayer(addr string, room *Room) *Player {
 func (p *Player) writeLoop(conn net.PacketConn) {
 	for pkt := range p.sendQueue {
 		conn.WriteTo(pkt.data, p.addr)
+		logging.Log("Packet delay: %v", time.Since(pkt.receivedTime))
 	}
 }
 

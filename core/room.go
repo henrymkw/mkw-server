@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"time"
 
 	"mkw-server/logging"
 )
@@ -68,11 +69,11 @@ func (r *Room) readLoop() {
 		}
 
 		pkt := Packet{
-			sender: addr,
-			data:   append([]byte{}, buf[:n]...),
+			sender:       addr,
+			data:         append([]byte{}, buf[:n]...),
+			receivedTime: time.Now(),
 		}
 
-		// push into a broadcast channel
 		r.broadcast <- pkt
 	}
 }
@@ -86,7 +87,7 @@ func (r *Room) broadcastLoop() {
 			select {
 			case player.sendQueue <- pkt:
 			default:
-				// Packet gets dropped
+				logging.Log("Send queue full for player %s, dropping packet", player.addr.String())
 			}
 		}
 	}
@@ -118,7 +119,7 @@ func (r *Room) RemovePlayerFromRoom(playerAddr string) bool {
 		logging.Log("Player %s does not exist in room", playerAddr)
 		return false
 	}
-	// end the broadcast/goroutine for this player
+
 	close(p.sendQueue)
 
 	delete(r.players, playerAddr)
