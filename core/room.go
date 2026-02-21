@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mkw-server/logging"
+	"mkw-server/settings"
 )
 
 // WFCTalkerInterface allows Room/Player to interact with WFC without circular dependency
@@ -91,10 +92,18 @@ func broadcastLoop() {
 			if player.addr.String() == pkt.sender.String() {
 				continue
 			}
-			select {
-			case player.sendQueue <- pkt:
-			default:
-				logging.Log("Send queue full for player %s, dropping packet", player.addr.String())
+			switch settings.GetPacketType() {
+			case settings.CombinedRace:
+				select {
+				case player.sendQueue <- pkt:
+				default:
+					logging.Log("Send queue full for player %s, dropping packet", player.addr.String())
+				}
+			case settings.Race:
+				_, err := RoomInstance.conn.WriteTo(pkt.data, player.addr)
+				if err != nil {
+					logging.Log("Error writing to player %s: %v", player.addr.String(), err)
+				}
 			}
 		}
 	}
@@ -114,7 +123,9 @@ func AddPlayerToRoom(playerAddr string) bool {
 
 	RoomInstance.players[playerAddr] = player
 
-	go player.writeLoop(RoomInstance.conn)
+	if settings.GetPacketType() == settings.CombinedRace {
+		go player.writeLoop(RoomInstance.conn)
+	}
 
 	logging.Log("Player %s added to room", playerAddr)
 	return true
@@ -127,7 +138,9 @@ func RemovePlayerFromRoom(playerAddr string) bool {
 		return false
 	}
 
-	close(p.sendQueue)
+	if settings.GetPacketType() == settings.CombinedRace {
+		close(p.sendQueue)
+	}
 
 	delete(RoomInstance.players, playerAddr)
 	logging.Log("Player %s removed from room", playerAddr)
