@@ -45,7 +45,7 @@ func main() {
 
 	logging.Log("Starting mkw-server. Room address=%s wfc-server address=%s\n", *roomAddr, *wfcAddr)
 
-	controller, err := controller.New(*roomAddr, *wfcAddr)
+	err = controller.CreateController(*roomAddr, *wfcAddr)
 
 	if err != nil {
 		logging.Log("Failed to initialize server: %v", err)

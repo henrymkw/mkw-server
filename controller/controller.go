@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"errors"
-
 	"mkw-server/core"
 	"mkw-server/logging"
 	"mkw-server/talker"
@@ -10,42 +8,37 @@ import (
 
 // Controller is supposed to start and stop the room and the WFC talker
 // currently it just feels like a wrapper
-type Controller struct {
-	room *core.Room // the room this controller is managing
-}
 
-// New creates a new controller with the given room address and WFC address
-func New(roomAddress string, wfcAddress string) (*Controller, error) {
-	room := core.NewRoom(roomAddress)
-	if room == nil {
-		logging.Log("Error creating room")
-		return nil, errors.New("Error creating room")
+// CreateController creates a new controller with the given room address and WFC address
+func CreateController(roomAddress string, wfcAddress string) error {
+	err := core.InitRoom(roomAddress)
+	if err != nil {
+		logging.Log("Failed to initialize room: %v", err)
+		return err
 	}
 
-	err := talker.NewWFCTalker(wfcAddress, room)
+	err = talker.NewWFCTalker(wfcAddress)
 	if err != nil {
 		logging.Log("Error creating WFC talker: %v", err)
-		return nil, err
+		return err
 	}
 
-	return &Controller{
-		room: room,
-	}, nil
+	return nil
 }
 
 // Start starts the room and the WFC talker
-func (c *Controller) Start() {
+func Start() {
 	talker.Start()
-	c.room.Start()
+	core.StartRoom()
 }
 
 // Close shuts down the room and the WFC talker
-func (c *Controller) Close() {
-	c.room.Close()
+func Close() {
+	core.CloseRoom()
 	talker.Close()
 }
 
 // NotifyShutdown notifies the WFC talker that the room is shutting down
-func (c *Controller) NotifyShutdown() {
+func NotifyShutdown() {
 	talker.NotifyMKWServerShutdown()
 }
