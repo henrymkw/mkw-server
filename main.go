@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,7 +15,11 @@ import (
 // created in wfc-server when it matches two players, well before players are notified they're
 // in a group. mkw-server has time to setup and start listeners before players are notified
 func main() {
-	logging.InitLogFile()
+	err := logging.InitLogFile()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logging: %v\n", err)
+		os.Exit(1)
+	}
 	defer logging.CloseLogFile()
 
 	// roomAddr is the address players send to and receive from

@@ -11,17 +11,17 @@ import (
 var LogFile *os.File
 
 // log files are grouped up by the data in logs
-func InitLogFile() {
+func InitLogFile() error {
 	// Use os.Executable() to get the canotical path of the logs directory
 	// relative paths are unreliable when the working directory is different
 	exePath, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	exePath, err = filepath.EvalSymlinks(exePath)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	exeDir := filepath.Dir(exePath)
@@ -33,19 +33,20 @@ func InitLogFile() {
 
 	err = os.MkdirAll(dateLogDir, 0755)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	timeStamp := now.Format("2006-01-02_15-04-05")
 	path := filepath.Join(dateLogDir, timeStamp+".log")
 
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	LogFile = f
 	log.SetOutput(LogFile)
+	return nil
 }
 
 func Log(message string, args ...interface{}) {

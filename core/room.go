@@ -98,13 +98,13 @@ func (r *Room) broadcastLoop() {
 	}
 }
 
-func (r *Room) AddPlayerToRoom(playerAddr string, wfcTalker WFCTalkerInterface) bool {
+func (r *Room) AddPlayerToRoom(playerAddr string) bool {
 	if _, exists := r.players[playerAddr]; exists {
 		logging.Log("Player %s already exists in room", playerAddr)
 		return false
 	}
 
-	player := NewPlayer(playerAddr, r, wfcTalker)
+	player := NewPlayer(playerAddr, r)
 	if player == nil {
 		logging.Log("Failed to create player %s", playerAddr)
 		return false

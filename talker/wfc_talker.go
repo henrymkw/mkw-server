@@ -14,54 +14,56 @@ type WFCTalker struct {
 	roomPointer *core.Room // Pointer to room, used to
 }
 
+var talker *WFCTalker
+
 const (
 	RoomOpened       = 0x1 // Server responce to notify WFC that room is open
 	ClientJoinFroom  = 0x2 // Used for both client requests and server responces
 	ClientLeaveFroom = 0x3 // Used for both client requests and server responces
 )
 
-func NewWFCTalker(serverAddress string, room *core.Room) (*WFCTalker, error) {
+func NewWFCTalker(serverAddress string, room *core.Room) error {
 	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		logging.Log("Failed to connect to WFC server: %v", err)
-		return nil, err
+		return err
 	}
 
 	if room == nil {
 		logging.Log("Room pointer is nil when creating WFC Talker")
-		return nil, err
+		return err
 	}
 
-	wfcTalker := &WFCTalker{
+	talker = &WFCTalker{
 		conn:        conn,
 		roomPointer: room,
 	}
 	// immediately tell wfc-server the room address
 	message := "ROOM_OPEN "
-	message += wfcTalker.roomPointer.GetAddr()
+	message += talker.roomPointer.GetAddr()
 
-	wfcTalker.SendMessageToWFC(message)
+	SendMessageToWFC(message)
 
-	return wfcTalker, nil
+	return nil
 }
 
-func (wt *WFCTalker) Start() {
+func Start() {
 	go func() {
 		buf := make([]byte, 128)
 		for {
-			n, err := wt.conn.Read(buf)
+			n, err := talker.conn.Read(buf)
 			if err != nil {
 				errMsg := "Error reading from WFC server"
 				logging.Log(errMsg)
 				return
 			}
 			data := string(buf[:n])
-			wt.HandleWFCPacket(data)
+			HandleWFCPacket(data)
 		}
 	}()
 }
 
-func (wt *WFCTalker) HandleWFCPacket(data string) {
+func HandleWFCPacket(data string) {
 	logging.Log("Received WFC Packet: %v", []byte(data))
 
 	// First byte indicates request type
@@ -69,29 +71,29 @@ func (wt *WFCTalker) HandleWFCPacket(data string) {
 	switch requestType {
 	case ClientJoinFroom:
 		// Actual data is after first 4 bytes
-		wt.HandleJoinRoomRequest(data[4:])
+		HandleJoinRoomRequest(data[4:])
 	case ClientLeaveFroom:
-		wt.HandleLeaveRoomRequest(data[4:])
+		HandleLeaveRoomRequest(data[4:])
 	default:
 		logging.Log("Unknown WFC request type: %d", requestType)
 	}
 }
 
 // addr is the address of the client that wants to join the room
-func (wt *WFCTalker) HandleJoinRoomRequest(addr string) {
+func HandleJoinRoomRequest(addr string) {
 	logging.Log("Handling WFC Join Friend Request with data: %s", addr)
 
-	if wt.roomPointer == nil {
+	if talker.roomPointer == nil {
 		logging.Log("ERROR! Room pointer is nil, cannot handle join friend request, this should not happen!")
 		return
 	}
 
-	addPlayerResult := wt.roomPointer.AddPlayerToRoom(addr, wt)
+	addPlayerResult := talker.roomPointer.AddPlayerToRoom(addr)
 	if !addPlayerResult {
 		logging.Log("Failed to add player from WFC Join Friend Request")
 		return
 	}
-	logging.Log("Successfully added player (", addr, ") ", "to room! Current player count is", wt.roomPointer.GetCurrentPlayerCount())
+	logging.Log("Successfully added player (", addr, ") ", "to room! Current player count is", talker.roomPointer.GetCurrentPlayerCount())
 
 	// Responce to wfc-server is "NEW_PLAYER {player_address} {room_address}"
 	// Player address is needed since it doesn't know which player sent the request
@@ -99,9 +101,9 @@ func (wt *WFCTalker) HandleJoinRoomRequest(addr string) {
 	message := "NEW_PLAYER "
 	message += addr
 	message += " "
-	message += wt.roomPointer.GetAddr()
+	message += talker.roomPointer.GetAddr()
 
-	err := wt.SendMessageToWFC(message)
+	err := SendMessageToWFC(message)
 	if err != nil {
 		logging.Log("Failed to notify WFC of new player: %v", err)
 		return
@@ -109,31 +111,31 @@ func (wt *WFCTalker) HandleJoinRoomRequest(addr string) {
 	logging.Log("Notified WFC of new player from Join Friend Request!")
 }
 
-func (wt *WFCTalker) HandleLeaveRoomRequest(addr string) {
+func HandleLeaveRoomRequest(addr string) {
 	logging.Log("Handling WFC Leave Friend Request with data: %s", addr)
 
-	if wt.roomPointer == nil {
+	if talker.roomPointer == nil {
 		logging.Log("ERROR! Room pointer is nil, cannot handle leave friend request, this should not happen!")
 		return
 	}
 
-	removePlayerResult := wt.roomPointer.RemovePlayerFromRoom(addr)
+	removePlayerResult := talker.roomPointer.RemovePlayerFromRoom(addr)
 	if !removePlayerResult {
 		logging.Log("Failed to remove player from WFC Leave Friend Request")
 		return
 	}
 
-	logging.Log("Successfully removed player (", addr, ") ", "from room! Current player count is", wt.roomPointer.GetCurrentPlayerCount())
+	logging.Log("Successfully removed player (", addr, ") ", "from room! Current player count is", talker.roomPointer.GetCurrentPlayerCount())
 }
 
-func (wt *WFCTalker) SendMessageToWFC(message string) error {
-	_, err := wt.conn.Write([]byte(message))
+func SendMessageToWFC(message string) error {
+	_, err := talker.conn.Write([]byte(message))
 	logging.Log("Sent to WFC: %s", message)
 	return err
 }
 
-func (wt *WFCTalker) SendPacketDataToWFC(data []byte) error {
-	_, err := wt.conn.Write(data)
+func SendPacketDataToWFC(data []byte) error {
+	_, err := talker.conn.Write(data)
 	if err != nil {
 		logging.Log("Failed to send packet data to WFC: %v", err)
 		return err
@@ -142,12 +144,12 @@ func (wt *WFCTalker) SendPacketDataToWFC(data []byte) error {
 	return nil
 }
 
-func (wt *WFCTalker) Close() {
-	wt.conn.Close()
+func Close() {
+	talker.conn.Close()
 }
 
-func (wt *WFCTalker) NotifyMKWServerShutdown() error {
+func NotifyMKWServerShutdown() error {
 	message := string("MKWSERVER_SHUTDOWN ")
-	message += wt.roomPointer.GetAddr()
-	return wt.SendMessageToWFC(message)
+	message += talker.roomPointer.GetAddr()
+	return SendMessageToWFC(message)
 }
