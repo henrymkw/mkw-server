@@ -22,46 +22,40 @@ type Room struct {
 	broadcast chan Packet // channel for broadcasting packets to all players
 }
 
-var RoomInstance *Room
+var room *Room
 
-func InitRoom(roomAddress string) error {
-	roomAddr, err := net.ResolveUDPAddr("udp", roomAddress)
-	if err != nil {
-		logging.Log("Failed to resolve room address %s: %v", roomAddress, err)
-		return err
-	}
-
-	RoomInstance = &Room{
+func InitRoom(roomAddr *net.UDPAddr) error {
+	room = &Room{
 		players: make(map[string]*Player),
 		addr:    roomAddr,
 		// 256 came out of nowhere, needs to be tested
 		broadcast: make(chan Packet, 256),
 	}
 
-	logging.Log("Room created successfully!", roomAddress)
+	logging.Log("Room created successfully!", roomAddr.String())
 	return nil
 }
 
 // Starts the listener and broadcaster goroutines
 func StartRoom() {
-	if RoomInstance.addr == nil {
+	if room.addr == nil {
 		logging.Log("Room address is nil, cannot start room")
 		return
 	}
 
-	if RoomInstance.conn != nil {
+	if room.conn != nil {
 		logging.Log("Room is already started")
 		return
 	}
 
-	conn, err := net.ListenPacket("udp", RoomInstance.addr.String())
+	conn, err := net.ListenPacket("udp", room.addr.String())
 	if err != nil {
-		logging.Log("Failed to start room at address %s: %v", RoomInstance.addr.String(), err)
+		logging.Log("Failed to start room at address %s: %v", room.addr.String(), err)
 		return
 	}
-	logging.Log("Room listening on %s", RoomInstance.addr.String())
+	logging.Log("Room listening on %s", room.addr.String())
 
-	RoomInstance.conn = conn
+	room.conn = conn
 
 	go readLoop()
 	go broadcastLoop()
@@ -70,7 +64,7 @@ func StartRoom() {
 func readLoop() {
 	buf := make([]byte, 512)
 	for {
-		n, addr, err := RoomInstance.conn.ReadFrom(buf)
+		n, addr, err := room.conn.ReadFrom(buf)
 		if err != nil {
 			logging.Log("Error reading from connection: %v", err)
 			return
@@ -82,13 +76,13 @@ func readLoop() {
 			receivedTime: time.Now(),
 		}
 
-		RoomInstance.broadcast <- pkt
+		room.broadcast <- pkt
 	}
 }
 
 func broadcastLoop() {
-	for pkt := range RoomInstance.broadcast {
-		for _, player := range RoomInstance.players {
+	for pkt := range room.broadcast {
+		for _, player := range room.players {
 			if player.addr.String() == pkt.sender.String() {
 				continue
 			}
@@ -100,7 +94,7 @@ func broadcastLoop() {
 					logging.Log("Send queue full for player %s, dropping packet", player.addr.String())
 				}
 			case settings.Race:
-				_, err := RoomInstance.conn.WriteTo(pkt.data, player.addr)
+				_, err := room.conn.WriteTo(pkt.data, player.addr)
 				if err != nil {
 					logging.Log("Error writing to player %s: %v", player.addr.String(), err)
 				}
@@ -109,22 +103,23 @@ func broadcastLoop() {
 	}
 }
 
-func AddPlayerToRoom(playerAddr string) bool {
-	if _, exists := RoomInstance.players[playerAddr]; exists {
+func AddPlayerToRoom(newPlayerAddr *net.UDPAddr) bool {
+	playerAddr := newPlayerAddr.String()
+	if _, exists := room.players[playerAddr]; exists {
 		logging.Log("Player %s already exists in room", playerAddr)
 		return false
 	}
 
-	player := NewPlayer(playerAddr, RoomInstance)
+	player := NewPlayer(playerAddr, room)
 	if player == nil {
 		logging.Log("Failed to create player %s", playerAddr)
 		return false
 	}
 
-	RoomInstance.players[playerAddr] = player
+	room.players[playerAddr] = player
 
 	if settings.GetPacketType() == settings.CombinedRace {
-		go player.writeLoop(RoomInstance.conn)
+		go player.writeLoop(room.conn)
 	}
 
 	logging.Log("Player %s added to room", playerAddr)
@@ -132,7 +127,7 @@ func AddPlayerToRoom(playerAddr string) bool {
 }
 
 func RemovePlayerFromRoom(playerAddr string) bool {
-	p, exists := RoomInstance.players[playerAddr]
+	p, exists := room.players[playerAddr]
 	if !exists {
 		logging.Log("Player %s does not exist in room", playerAddr)
 		return false
@@ -142,19 +137,23 @@ func RemovePlayerFromRoom(playerAddr string) bool {
 		close(p.sendQueue)
 	}
 
-	delete(RoomInstance.players, playerAddr)
+	delete(room.players, playerAddr)
 	logging.Log("Player %s removed from room", playerAddr)
 	return true
 }
 
 func GetRoomAddr() string {
-	return RoomInstance.addr.String()
+	return room.addr.String()
 }
 
 func GetCurrentPlayerCount() int {
-	return len(RoomInstance.players)
+	return len(room.players)
 }
 
 func CloseRoom() {
-	RoomInstance.conn.Close()
+	room.conn.Close()
+}
+
+func RoomInitialized() bool {
+	return room != nil
 }

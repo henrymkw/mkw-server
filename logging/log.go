@@ -9,6 +9,7 @@ import (
 )
 
 var LogFile *os.File
+var sendFunc func(msg string) error
 
 // log files are grouped up by the data in logs
 func InitLogFile() error {

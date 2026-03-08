@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"net"
+
 	"mkw-server/core"
 	"mkw-server/logging"
 	"mkw-server/talker"
@@ -11,13 +13,19 @@ import (
 
 // CreateController creates a new controller with the given room address and WFC address
 func CreateController(roomAddress string, wfcAddress string) error {
-	err := core.InitRoom(roomAddress)
+	udpAddr, err := net.ResolveUDPAddr("udp", roomAddress)
+	if err != nil {
+		logging.Log("Couldn't resolve udp address for room:", roomAddress)
+		return err
+	}
+
+	err = core.InitRoom(udpAddr)
 	if err != nil {
 		logging.Log("Failed to initialize room: %v", err)
 		return err
 	}
 
-	err = talker.NewWFCTalker(wfcAddress)
+	err = talker.NewWFCTalker(uint16(udpAddr.Port), wfcAddress)
 	if err != nil {
 		logging.Log("Error creating WFC talker: %v", err)
 		return err
