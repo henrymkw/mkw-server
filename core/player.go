@@ -28,8 +28,8 @@ func NewPlayer(addr string, room *Room) *Player {
 	}
 
 	player := &Player{
-		addr:      udpAddr,
-		sendQueue: make(chan Packet, 32),
+		addr:      	udpAddr,
+		sendQueue: 	make(chan Packet, 32),
 	}
 
 	return player

@@ -103,8 +103,7 @@ func broadcastLoop() {
 	}
 }
 
-func AddPlayerToRoom(newPlayerAddr *net.UDPAddr) bool {
-	playerAddr := newPlayerAddr.String()
+func AddPlayerToRoom(playerAddr string) bool {
 	if _, exists := room.players[playerAddr]; exists {
 		logging.Log("Player %s already exists in room", playerAddr)
 		return false
@@ -127,19 +126,31 @@ func AddPlayerToRoom(newPlayerAddr *net.UDPAddr) bool {
 }
 
 func RemovePlayerFromRoom(playerAddr string) bool {
-	p, exists := room.players[playerAddr]
-	if !exists {
-		logging.Log("Player %s does not exist in room", playerAddr)
+	logging.Log("Attempting to remove %s from room", playerAddr)
+
+	p, _ := room.players[playerAddr]
+
+	if p == nil {
+		logging.Log("Player %s not in room, can't remove")
 		return false
 	}
 
-	if settings.GetPacketType() == settings.CombinedRace {
-		close(p.sendQueue)
-	}
 
 	delete(room.players, playerAddr)
 	logging.Log("Player %s removed from room", playerAddr)
 	return true
+}
+
+// gets the player if the player is the room's host
+func GetHost(playerAddr string) *Player {
+	p, _ := room.players[playerAddr]
+
+	if p == nil {
+		logging.Log("Player %s not in room, can't remove")
+		return nil 
+	}
+
+	return nil
 }
 
 func GetRoomAddr() string {

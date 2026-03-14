@@ -20,10 +20,9 @@ var wfcTalker *WFCTalker
 type MKWServerMessage uint8
 
 const (
-	OpenRoom     = 0x00
-	AddPlayer    = 0x01
-	CloseRoom    = 0x02
-	RemovePlayer = 0x03
+	OpenFroom     = 0x00
+	JoinFroom	  = 0x01
+	LeaveFroom    = 0x02
 )
 
 func NewWFCTalker(port uint16, serverAddress string) error {
@@ -67,7 +66,7 @@ func Start() {
 func sendRoomOpen() {
 	pb := &util.PacketBuilder{Buf: make([]byte, 0, 3)}
 
-	pb.WriteUint8(OpenRoom)
+	pb.WriteUint8(OpenFroom)
 	pb.WriteUint16(wfcTalker.port)
 
 	SendToWFC(pb.Buf)
@@ -79,32 +78,25 @@ func HandleWFCPacket(msg []byte) {
 	// First byte indicates request type
 	requestType := msg[0]
 	switch requestType {
-	case AddPlayer:
+	case JoinFroom:
 		// Actual data is after first 4 bytes
-		logging.Log("Handling Add Player!")
-		handleAddPlayer(unpackNewPlayer(msg[1:]))
-	case RemovePlayer:
-		// HandleLeaveRoomRequest(data[1:])
+		logging.Log("Handling OpenFroom")
+		joinFroomMessage := unpackJoinFroomMessage(msg[1:])
+		if joinFroomMessage == nil {
+			logging.Log("JoinFroomMessage is nil")
+			return
+		}
+		handleJoinFroomMessage(joinFroomMessage)
+	case LeaveFroom:
+		leaveFroomMessage := unpackLeaveFroomMessage(msg[1:])
+		if leaveFroomMessage == nil {
+			logging.Log("Leave froom message is nil!")
+			return
+		}
+		handleLeaveRoomRequest(leaveFroomMessage)
 	default:
 		logging.Log("Unknown WFC request type: %d", requestType)
 	}
-}
-
-func HandleLeaveRoomRequest(clientAddr string) {
-	logging.Log("Handling WFC Leave Friend Request with data: %s", clientAddr)
-
-	if !core.RoomInitialized() {
-		logging.Log("ERROR! Room pointer is nil, cannot handle leave friend request, this should not happen!")
-		return
-	}
-
-	removePlayerResult := core.RemovePlayerFromRoom(clientAddr)
-	if !removePlayerResult {
-		logging.Log("Failed to remove player from WFC Leave Friend Request")
-		return
-	}
-
-	logging.Log("Successfully removed player (", clientAddr, ") ", "from room! Current player count is", core.GetCurrentPlayerCount())
 }
 
 func SendToWFC(msg []byte) error {
@@ -137,12 +129,6 @@ func SendPacketDataToWFC(data []byte) error {
 
 func Close() {
 	wfcTalker.conn.Close()
-}
-
-func NotifyMKWServerShutdown() error {
-	message := string("MKWSERVER_SHUTDOWN ")
-	message += core.GetRoomAddr()
-	return SendMessageToWFC(message)
 }
 
 func TalkerInitialized() bool {

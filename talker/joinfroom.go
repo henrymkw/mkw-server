@@ -8,8 +8,8 @@ import (
 	"mkw-server/util"
 )
 
-// Id: AddPlayer (0x01)
-type MKWServerNewPlayer struct {
+// Id: JoinFroom (0x01)
+type JoinFroomMessage struct {
 	addr     uint32
 	port     uint16
 	aid      uint8
@@ -17,19 +17,19 @@ type MKWServerNewPlayer struct {
 	searchId uint64
 }
 
-// Id: AddPlayer (0x01)
-type MKWServerNewPlayerResp struct {
+// Id: JoinFroom (0x01)
+type JoinFroomResp struct {
 	searchId uint64
 }
 
-func unpackNewPlayer(msg []byte) *MKWServerNewPlayer {
+func unpackJoinFroomMessage(msg []byte) *JoinFroomMessage {
 	if len(msg) != 16 {
 		return nil
 	}
 
 	logging.Log("unpackNewPlayer: msg", msg)
 
-	return &MKWServerNewPlayer{
+	return &JoinFroomMessage{
 		addr:     binary.BigEndian.Uint32(msg[0:4]),
 		port:     binary.BigEndian.Uint16(msg[4:6]),
 		aid:      uint8(msg[6]),
@@ -41,13 +41,13 @@ func unpackNewPlayer(msg []byte) *MKWServerNewPlayer {
 func packResponce(searchId uint64) []byte {
 	b := make([]byte, 9)
 
-	b[0] = AddPlayer
+	b[0] = JoinFroom
 	binary.BigEndian.PutUint64(b[1:], searchId)
 	return b
 }
 
 // addr is the address of the client that wants to join the room
-func handleAddPlayer(newPlayerMsg *MKWServerNewPlayer) {
+func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) {
 	logging.Log("Handling WFC Join Friend Request")
 
 	logging.Log("newPlayerMsg fields: addr:", newPlayerMsg.addr, "port", newPlayerMsg.port, "aid", newPlayerMsg.aid, "isHost", newPlayerMsg.isHost, "searchId", newPlayerMsg.searchId)
@@ -64,11 +64,11 @@ func handleAddPlayer(newPlayerMsg *MKWServerNewPlayer) {
 
 	addr := util.CreateUDPAddr(newPlayerMsg.addr, newPlayerMsg.port)
 	if addr == nil {
-		logging.Log("addr is nil in HandleAddPlayer")
+		logging.Log("addr is nil in HandleJoinFroom")
 		return
 	}
 
-	addPlayerResult := core.AddPlayerToRoom(addr)
+	addPlayerResult := core.AddPlayerToRoom(addr.String())
 	if !addPlayerResult {
 		logging.Log("Failed to add player from WFC Join Friend Request")
 		return

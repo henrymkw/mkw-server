@@ -48,5 +48,5 @@ func Close() {
 
 // NotifyShutdown notifies the WFC talker that the room is shutting down
 func NotifyShutdown() {
-	talker.NotifyMKWServerShutdown()
+	// nothing for now
 }
