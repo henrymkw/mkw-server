@@ -2,6 +2,8 @@ package talker
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 
 	"mkw-server/core"
 	"mkw-server/logging"
@@ -10,7 +12,7 @@ import (
 
 // Id: JoinFroom (0x01)
 type JoinFroomMessage struct {
-	addr     uint32
+	ip       uint32
 	port     uint16
 	aid      uint8
 	isHost   bool
@@ -22,20 +24,18 @@ type JoinFroomResp struct {
 	searchId uint64
 }
 
-func unpackJoinFroomMessage(msg []byte) *JoinFroomMessage {
+func unpackJoinFroomMessage(msg []byte) (*JoinFroomMessage, error) {
 	if len(msg) != 16 {
-		return nil
+		return nil, fmt.Errorf("Unable to unpack JoinFroomMessage! len(msg) != 16 (%d)", len(msg))
 	}
 
-	logging.Log("unpackNewPlayer: msg", msg)
-
 	return &JoinFroomMessage{
-		addr:     binary.BigEndian.Uint32(msg[0:4]),
+		ip:       binary.BigEndian.Uint32(msg[0:4]),
 		port:     binary.BigEndian.Uint16(msg[4:6]),
 		aid:      uint8(msg[6]),
 		isHost:   msg[7] == 1,
 		searchId: binary.BigEndian.Uint64(msg[8:]),
-	}
+	}, nil
 }
 
 func packResponce(searchId uint64) []byte {
@@ -47,38 +47,31 @@ func packResponce(searchId uint64) []byte {
 }
 
 // addr is the address of the client that wants to join the room
-func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) {
-	logging.Log("Handling WFC Join Friend Request")
-
-	logging.Log("newPlayerMsg fields: addr:", newPlayerMsg.addr, "port", newPlayerMsg.port, "aid", newPlayerMsg.aid, "isHost", newPlayerMsg.isHost, "searchId", newPlayerMsg.searchId)
+func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) error {
+	if newPlayerMsg == nil {
+		return errors.New("newPlayerMsg is nil!")
+	}
 
 	if !core.RoomInitialized() {
-		logging.Log("ERROR! Room pointer is nil, cannot handle join friend request, this should not happen!")
-		return
+		return errors.New("Room isn't initialized, this should not happen at this point")
 	}
 
-	if newPlayerMsg == nil {
-		logging.Log("newPlayerMsg is nil!")
-		return
-	}
-
-	addr := util.CreateUDPAddr(newPlayerMsg.addr, newPlayerMsg.port)
+	addr := util.CreateUDPAddr(newPlayerMsg.ip, newPlayerMsg.port)
 	if addr == nil {
-		logging.Log("addr is nil in HandleJoinFroom")
-		return
+		return errors.New("CreateUDPAddr returned nil")
 	}
 
-	addPlayerResult := core.AddPlayerToRoom(addr.String())
-	if !addPlayerResult {
-		logging.Log("Failed to add player from WFC Join Friend Request")
-		return
-	}
-	logging.Log("Successfully added player (", addr.String(), ") ", "to room! Current player count is", core.GetCurrentPlayerCount())
-
-	err := SendToWFC(packResponce(newPlayerMsg.searchId))
+	err := core.AddPlayerToRoom(addr.String())
 	if err != nil {
-		logging.Log("Failed to notify WFC of new player: %v", err)
-		return
+		return fmt.Errorf(err.Error())
+	}
+
+	logging.Log("Successfully added player to room! Current player count is", core.GetCurrentPlayerCount())
+
+	err = SendToWFC(packResponce(newPlayerMsg.searchId))
+	if err != nil {
+		return fmt.Errorf("Failed to notify WFC of new player: %v", err)
 	}
 	logging.Log("Notified WFC of new player from Join Friend Request!")
+	return nil
 }

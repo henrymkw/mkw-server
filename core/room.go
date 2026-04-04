@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -103,16 +104,14 @@ func broadcastLoop() {
 	}
 }
 
-func AddPlayerToRoom(playerAddr string) bool {
+func AddPlayerToRoom(playerAddr string) error {
 	if _, exists := room.players[playerAddr]; exists {
-		logging.Log("Player %s already exists in room", playerAddr)
-		return false
+		return fmt.Errorf("Player %s already exists in room", playerAddr)
 	}
 
-	player := NewPlayer(playerAddr, room)
-	if player == nil {
-		logging.Log("Failed to create player %s", playerAddr)
-		return false
+	player, err := NewPlayer(playerAddr, room)
+	if err != nil {
+		return fmt.Errorf("Failed to create player %s due to", playerAddr, err)
 	}
 
 	room.players[playerAddr] = player
@@ -122,23 +121,18 @@ func AddPlayerToRoom(playerAddr string) bool {
 	}
 
 	logging.Log("Player %s added to room", playerAddr)
-	return true
+	return nil
 }
 
-func RemovePlayerFromRoom(playerAddr string) bool {
-	logging.Log("Attempting to remove %s from room", playerAddr)
-
+func RemovePlayerFromRoom(playerAddr string) error {
 	p, _ := room.players[playerAddr]
 
 	if p == nil {
-		logging.Log("Player %s not in room, can't remove")
-		return false
+		return fmt.Errorf("Player %s not in room, can't remove", playerAddr)
 	}
 
-
 	delete(room.players, playerAddr)
-	logging.Log("Player %s removed from room", playerAddr)
-	return true
+	return nil
 }
 
 // gets the player if the player is the room's host
@@ -147,7 +141,7 @@ func GetHost(playerAddr string) *Player {
 
 	if p == nil {
 		logging.Log("Player %s not in room, can't remove")
-		return nil 
+		return nil
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package talker
 
 import (
+	"errors"
 	"net"
 
 	"mkw-server/core"
@@ -20,9 +21,10 @@ var wfcTalker *WFCTalker
 type MKWServerMessage uint8
 
 const (
-	OpenFroom     = 0x00
-	JoinFroom	  = 0x01
-	LeaveFroom    = 0x02
+	OpenFroom      = 0x00
+	JoinFroom      = 0x01
+	LeaveFroom     = 0x02
+	LogToWFCServer = 0xff
 )
 
 func NewWFCTalker(port uint16, serverAddress string) error {
@@ -41,6 +43,8 @@ func NewWFCTalker(port uint16, serverAddress string) error {
 		conn: conn,
 		port: port,
 	}
+	logging.Log("Talker created! (Hello wfc-server!)")
+
 	// immediately tell wfc-server the room address
 	sendRoomOpen()
 
@@ -69,51 +73,77 @@ func sendRoomOpen() {
 	pb.WriteUint8(OpenFroom)
 	pb.WriteUint16(wfcTalker.port)
 
+	logging.Log("Sending OpenRoom to wfc-server")
 	SendToWFC(pb.Buf)
 }
 
 func HandleWFCPacket(msg []byte) {
-	logging.Log("Received WFC Packet: %v", msg)
-
 	// First byte indicates request type
 	requestType := msg[0]
 	switch requestType {
 	case JoinFroom:
-		// Actual data is after first 4 bytes
-		logging.Log("Handling OpenFroom")
-		joinFroomMessage := unpackJoinFroomMessage(msg[1:])
-		if joinFroomMessage == nil {
-			logging.Log("JoinFroomMessage is nil")
+		logging.Log("Received JoinFroom")
+		joinFroomMessage, err := unpackJoinFroomMessage(msg[1:])
+		if err != nil {
+			logging.Log(err.Error())
 			return
 		}
-		handleJoinFroomMessage(joinFroomMessage)
+
+		err = handleJoinFroomMessage(joinFroomMessage)
+		if err != nil {
+			logging.Log("Failed to handle JoinFroom for reason %s:", err.Error())
+		}
+		logging.Log("Successfully handled JoinFroom for player %s", util.FormatIPPort(joinFroomMessage.ip, joinFroomMessage.port))
+
 	case LeaveFroom:
-		leaveFroomMessage := unpackLeaveFroomMessage(msg[1:])
-		if leaveFroomMessage == nil {
-			logging.Log("Leave froom message is nil!")
+		logging.Log("Received LeaveFroom")
+		leaveFroomMessage, err := unpackLeaveFroomMessage(msg[1:])
+		if err != nil {
+			logging.Log("Unable to unpack LeaveFroomMessage for reason %s", err.Error())
 			return
 		}
-		handleLeaveRoomRequest(leaveFroomMessage)
+
+		err = handleLeaveRoomRequest(leaveFroomMessage)
+		if err != nil {
+			logging.Log("Failed to handle LeaveFroom for reason %s:", err.Error())
+		}
+		logging.Log("Successfully handled LeaveFroom for player %s", util.FormatIPPort(leaveFroomMessage.ip, leaveFroomMessage.port))
+
 	default:
-		logging.Log("Unknown WFC request type: %d", requestType)
+		logging.Log("Received Unknown Request %d from wfc-server of length %d", requestType, len(msg))
 	}
 }
 
 func SendToWFC(msg []byte) error {
-	_, err := wfcTalker.conn.Write(msg)
+	// Messages need to be wrapped around delimiters to prevent
+	// messages from being streamed together.
+
+	// messages are prefixed with 0xbb, 0xef, 0xdc, 0xc8
+	// and suffixed with 0xce, 0xf9, 0xd3, 0xaa
+
+	out := append([]byte{0xbb, 0xef, 0xdc, 0xc8}, msg...)
+	out = append(out, []byte{0xce, 0xf9, 0xd3, 0xaa}...)
+	_, err := wfcTalker.conn.Write(out)
 	return err
 }
 
 func SendMessageToWFC(message string) error {
 	if wfcTalker == nil {
-		return nil
+		return errors.New("Can't send to wfc-server, talker is nil")
 	}
 
 	if wfcTalker.conn == nil {
-		return nil
+		return errors.New("Can't send to wfc-server, talker.conn is nil")
 	}
-	wfcTalker.conn.Write([]byte(message))
-	logging.Log("Sent to WFC: %s", message)
+
+	// wfc-server knows to log mkw-server logs with LogToWFCServer (0xff)
+	data := append([]byte{LogToWFCServer}, message...)
+
+	err := SendToWFC(data)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

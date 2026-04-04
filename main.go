@@ -10,6 +10,7 @@ import (
 	"mkw-server/controller"
 	"mkw-server/logging"
 	"mkw-server/settings"
+	"mkw-server/talker"
 )
 
 // mkw-server starts when a group is created in wfc-server and a group is
@@ -18,7 +19,7 @@ import (
 func main() {
 	settings.InitDefaultSettings()
 
-	err := logging.InitLogFile()
+	err := logging.InitLogFile(talker.SendMessageToWFC)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logging: %v\n", err)
 		os.Exit(1)

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -20,19 +21,18 @@ type Player struct {
 	// - One goroutine per player to write packets from their send queue to their address
 }
 
-func NewPlayer(addr string, room *Room) *Player {
+func NewPlayer(addr string, room *Room) (*Player, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		logging.Log("Failed to resolve player address %s: %v", addr, err)
-		return nil
+		return nil, fmt.Errorf("Failed to resolve player address %s: %v", addr, err)
 	}
 
 	player := &Player{
-		addr:      	udpAddr,
-		sendQueue: 	make(chan Packet, 32),
+		addr:      udpAddr,
+		sendQueue: make(chan Packet, 32),
 	}
 
-	return player
+	return player, nil
 }
 
 func (p *Player) writeLoop(conn net.PacketConn) {

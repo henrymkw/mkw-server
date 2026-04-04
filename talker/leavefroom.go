@@ -2,6 +2,8 @@ package talker
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 
 	"mkw-server/core"
 	"mkw-server/logging"
@@ -10,53 +12,41 @@ import (
 
 // Id: LeaveFroom (0x02)
 type LeaveFroomMessage struct {
-	ip 			uint32
-	port 		uint16
+	ip   uint32
+	port uint16
 }
 
-func unpackLeaveFroomMessage(msg []byte) *LeaveFroomMessage {
+func unpackLeaveFroomMessage(msg []byte) (*LeaveFroomMessage, error) {
 	if len(msg) != 6 {
-		logging.Log("LeaveFroomMessage isn't 6 bytes (%d)", len(msg))
-		return nil
+		return nil, fmt.Errorf("LeaveFroomMessage isn't 6 bytes (%d)", len(msg))
 	}
-	
-	logging.Log("")
 
 	return &LeaveFroomMessage{
-		ip:		binary.BigEndian.Uint32(msg[0:4]),
-		port:		binary.BigEndian.Uint16(msg[4:6]),
-	}
+		ip:   binary.BigEndian.Uint32(msg[0:4]),
+		port: binary.BigEndian.Uint16(msg[4:6]),
+	}, nil
 }
 
-func handleLeaveRoomRequest(leaveMessage *LeaveFroomMessage) {
-	logging.Log("Handling WFC Leave Friend Request")
-
-	if !core.RoomInitialized() {
-		logging.Log("ERROR! Room pointer is nil, cannot handle leave friend request, this should not happen!")
-		return
+func handleLeaveRoomRequest(leaveMessage *LeaveFroomMessage) error {
+	if leaveMessage == nil {
+		return errors.New("LeaveMessage is nil")
 	}
 
-	logging.Log("Room is initialized")
+	logging.Log("Handling LeaveFroom. Attempting to remove player %s", util.FormatIPPort(leaveMessage.ip, leaveMessage.port))
 
-	if leaveMessage == nil {
-		logging.Log("LeaveMEssage is nil")
+	if !core.RoomInitialized() {
+		return errors.New("Room isn't initialized, this shouldn't happen at this point")
 	}
 
 	addr := util.CreateUDPAddr(leaveMessage.ip, leaveMessage.port)
 	if addr == nil {
-		logging.Log("addr is nil in handleLeaveRoomRequest")
-		return
+		return errors.New("CreateUDPAddr failed in handleLeaveRoomRequest")
 	}
 
-	logging.Log("UDP Addr created")
-
-	removePlayerResult := core.RemovePlayerFromRoom(addr.String())
-	if !removePlayerResult {
-		logging.Log("Failed to remove player from WFC Leave Friend Request")
-		return
+	err := core.RemovePlayerFromRoom(addr.String())
+	if err != nil {
+		return err
 	}
 
-	logging.Log("Successfully removed player (", addr.String(), ") ", "from room! Current player count is", core.GetCurrentPlayerCount())
+	return nil
 }
-
-
