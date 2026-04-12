@@ -61,7 +61,7 @@ func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) error {
 		return errors.New("CreateUDPAddr returned nil")
 	}
 
-	err := core.AddPlayerToRoom(addr.String())
+	err := core.AddPlayerToRoom(addr.String(), newPlayerMsg.aid)
 	if err != nil {
 		return fmt.Errorf(err.Error())
 	}
