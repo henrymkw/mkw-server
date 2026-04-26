@@ -102,7 +102,7 @@ func broadcastLoop() {
 		for _, aid := range *receivingAids {
 			p := getPlayer(aid) 
 			if p == nil {
-				logging.Log("Unable to find player for aid %d", aid)
+				// This can happen when someone left, but wfc-server hasn't yet informed other players yet
 				continue
 			}
 
