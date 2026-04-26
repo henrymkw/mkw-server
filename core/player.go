@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -13,6 +14,8 @@ type Player struct {
 	roomPointer *Room        // The room this player is in
 
 	sendQueue chan Packet
+
+	aid byte
 	// We have a few different options on how to structure communication
 	// - I chose to have one goroutine per room to listen and read incoming packets
 	//   - maybe this could be a bottleneck
@@ -20,19 +23,20 @@ type Player struct {
 	// - One goroutine per player to write packets from their send queue to their address
 }
 
-func NewPlayer(addr string, room *Room) *Player {
+func NewPlayer(addr string, room *Room, aid byte) (*Player, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		logging.Log("Failed to resolve player address %s: %v", addr, err)
-		return nil
+		return nil, fmt.Errorf("Failed to resolve player address %s: %v", addr, err)
 	}
 
 	player := &Player{
 		addr:      udpAddr,
 		sendQueue: make(chan Packet, 32),
+		aid:	   aid,
 	}
 
-	return player
+	logging.Log("new player added with aid %d", aid)
+	return player, nil
 }
 
 func (p *Player) writeLoop(conn net.PacketConn) {

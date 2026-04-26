@@ -9,9 +9,10 @@ import (
 )
 
 var LogFile *os.File
+var sendFunc func(msg string) error
 
-// log files are grouped up by the data in logs
-func InitLogFile() error {
+// Passing in a function that sends logs to wfc-server is done here to avoid circular dependencies
+func InitLogFile(sendToWFCServer func(msg string) error) error {
 	// Use os.Executable() to get the canotical path of the logs directory
 	// relative paths are unreliable when the working directory is different
 	exePath, err := os.Executable()
@@ -46,6 +47,10 @@ func InitLogFile() error {
 
 	LogFile = f
 	log.SetOutput(LogFile)
+
+	if sendToWFCServer != nil {
+		sendFunc = sendToWFCServer
+	}
 	return nil
 }
 
@@ -53,11 +58,19 @@ func Log(message string, args ...interface{}) {
 	message = fmt.Sprintf(message, args...)
 
 	if LogFile == nil {
-		InitLogFile()
+		InitLogFile(nil)
 	}
 
 	log.SetOutput(LogFile)
 	log.Println(message)
+
+	if sendFunc != nil {
+		err := sendFunc(message)
+		if err != nil {
+			log.Println("SendToWFCServer failed for some reason")
+		}
+	}
+
 }
 
 func CloseLogFile() {
