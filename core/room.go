@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"mkw-server/logging"
-	"mkw-server/settings"
 	"mkw-server/util"
 )
 
@@ -85,8 +84,6 @@ func readLoop() {
 	}
 }
 
-
-
 func broadcastLoop() {
 	for pkt := range room.broadcast {
 		data := pkt.data
@@ -100,7 +97,7 @@ func broadcastLoop() {
 		receivingAids := util.GetSendToAids(aidBitmap)
 
 		for _, aid := range *receivingAids {
-			p := getPlayer(aid) 
+			p := getPlayer(aid)
 			if p == nil {
 				// This can happen when someone left, but wfc-server hasn't yet informed other players yet
 				continue
@@ -125,7 +122,7 @@ func getPlayer(aid byte) *Player {
 		if addr == "" || p == nil {
 			continue
 		}
-		
+
 		if p.aid == aid {
 			return p
 		}
@@ -145,10 +142,6 @@ func AddPlayerToRoom(playerAddr string, aid byte) error {
 	}
 
 	room.players[playerAddr] = player
-
-	if settings.GetPacketType() == settings.CombinedRace {
-		go player.writeLoop(room.conn)
-	}
 
 	logging.Log("Player %s added to room", playerAddr)
 	return nil

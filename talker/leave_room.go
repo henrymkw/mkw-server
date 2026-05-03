@@ -10,29 +10,29 @@ import (
 	"mkw-server/util"
 )
 
-// Id: LeaveFroom (0x02)
-type LeaveFroomMessage struct {
+// Id: LeaveRoom (0x02)
+type LeaveRoomMessage struct {
 	ip   uint32
 	port uint16
 }
 
-func unpackLeaveFroomMessage(msg []byte) (*LeaveFroomMessage, error) {
+func unpackLeaveRoomMessage(msg []byte) (*LeaveRoomMessage, error) {
 	if len(msg) != 6 {
-		return nil, fmt.Errorf("LeaveFroomMessage isn't 6 bytes (%d)", len(msg))
+		return nil, fmt.Errorf("LeaveRoomMessage isn't 6 bytes (%d)", len(msg))
 	}
 
-	return &LeaveFroomMessage{
+	return &LeaveRoomMessage{
 		ip:   binary.BigEndian.Uint32(msg[0:4]),
 		port: binary.BigEndian.Uint16(msg[4:6]),
 	}, nil
 }
 
-func handleLeaveRoomRequest(leaveMessage *LeaveFroomMessage) error {
+func handleLeaveRoomRequest(leaveMessage *LeaveRoomMessage) error {
 	if leaveMessage == nil {
 		return errors.New("LeaveMessage is nil")
 	}
 
-	logging.Log("Handling LeaveFroom. Attempting to remove player %s", util.FormatIPPort(leaveMessage.ip, leaveMessage.port))
+	logging.Log("Handling LeaveRoom. Attempting to remove player %s", util.FormatIPPort(leaveMessage.ip, leaveMessage.port))
 
 	if !core.RoomInitialized() {
 		return errors.New("Room isn't initialized, this shouldn't happen at this point")

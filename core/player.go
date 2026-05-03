@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"net"
-	"time"
 
 	"mkw-server/logging"
 )
@@ -32,65 +31,11 @@ func NewPlayer(addr string, room *Room, aid byte) (*Player, error) {
 	player := &Player{
 		addr:      udpAddr,
 		sendQueue: make(chan Packet, 32),
-		aid:	   aid,
+		aid:       aid,
 	}
 
-	logging.Log("new player added with aid %d", aid)
+	logging.Log("New player added. Aid: %d", aid)
 	return player, nil
-}
-
-func (p *Player) writeLoop(conn net.PacketConn) {
-	// will need to configure and experiment with the time and batch sizes, etc
-	ticker := time.NewTicker(500 * time.Microsecond)
-	defer ticker.Stop()
-
-	const maxUDPSize = 1465
-
-	// Map from sender address to packet
-	batch := make(map[string]Packet, 12)
-	var oldestTime time.Time
-
-	for {
-		select {
-		case packet, ok := <-p.sendQueue:
-			if !ok {
-				return
-			}
-			senderAddr := packet.sender.String()
-			// Update with latest packet from this sender
-			batch[senderAddr] = packet
-			// Track oldest packet time
-			if oldestTime.IsZero() || packet.receivedTime.Before(oldestTime) {
-				oldestTime = packet.receivedTime
-			}
-		case <-ticker.C:
-			if len(batch) == 0 {
-				continue
-			}
-
-			packetsToSend := make([][]byte, 0, len(batch))
-
-			// Collect packets to send (one per sender)
-			for _, pkt := range batch {
-				packetsToSend = append(packetsToSend, pkt.data)
-			}
-
-			// Build combined packet with header
-			combinedPackets := BuildCombinedPacket(packetsToSend, maxUDPSize)
-
-			// Send all combined packets
-			for _, combined := range combinedPackets {
-				conn.WriteTo(combined, p.addr)
-				header := ParseCombinedPacketHeader(combined)
-				logging.Log("Sent combined packet: %d packets, %d bytes to %s, delay: %v",
-					header.NumPackets, len(combined), p.addr.String(), time.Since(oldestTime))
-			}
-
-			// Clear batch
-			batch = make(map[string]Packet, 12)
-			oldestTime = time.Time{}
-		}
-	}
 }
 
 func (p *Player) SetRoomPointer(room *Room) {

@@ -1,6 +1,7 @@
 package talker
 
 import (
+	"encoding/binary"
 	"errors"
 	"net"
 
@@ -21,9 +22,9 @@ var wfcTalker *WFCTalker
 type MKWServerMessage uint8
 
 const (
-	OpenFroom      = 0x00
-	JoinFroom      = 0x01
-	LeaveFroom     = 0x02
+	OpenRoom       = 0x00
+	JoinRoom       = 0x01
+	LeaveRoom      = 0x02
 	LogToWFCServer = 0xff
 )
 
@@ -68,46 +69,43 @@ func Start() {
 }
 
 func sendRoomOpen() {
-	pb := &util.PacketBuilder{Buf: make([]byte, 0, 3)}
-
-	pb.WriteUint8(OpenFroom)
-	pb.WriteUint16(wfcTalker.port)
-
+	buf := make([]byte, 3)
+	buf[0] = OpenRoom
+	binary.BigEndian.PutUint16(buf[1:], wfcTalker.port)
 	logging.Log("Sending OpenRoom to wfc-server")
-	SendToWFC(pb.Buf)
+	SendToWFC(buf)
 }
 
 func HandleWFCPacket(msg []byte) {
 	// First byte indicates request type
 	requestType := msg[0]
 	switch requestType {
-	case JoinFroom:
-		logging.Log("Received JoinFroom")
-		joinFroomMessage, err := unpackJoinFroomMessage(msg[1:])
+	case JoinRoom:
+		logging.Log("Received JoinRoom")
+		joinRoomMessage, err := unpackJoinRoomMessage(msg[1:])
 		if err != nil {
 			logging.Log(err.Error())
 			return
 		}
 
-		err = handleJoinFroomMessage(joinFroomMessage)
+		err = handleJoinRoomMessage(joinRoomMessage)
 		if err != nil {
-			logging.Log("Failed to handle JoinFroom for reason %s:", err.Error())
+			logging.Log("Failed to handle JoinRoom for reason %s:", err.Error())
 		}
-		logging.Log("Successfully handled JoinFroom for player %s", util.FormatIPPort(joinFroomMessage.ip, joinFroomMessage.port))
+		logging.Log("Successfully handled JoinRoom for player %s", util.FormatIPPort(joinRoomMessage.ip, joinRoomMessage.port))
 
-	case LeaveFroom:
-		logging.Log("Received LeaveFroom")
-		leaveFroomMessage, err := unpackLeaveFroomMessage(msg[1:])
+	case LeaveRoom:
+		leaveRoomMessage, err := unpackLeaveRoomMessage(msg[1:])
 		if err != nil {
-			logging.Log("Unable to unpack LeaveFroomMessage for reason %s", err.Error())
+			logging.Log("Unable to unpack LeaveRoomMessage for reason %s", err.Error())
 			return
 		}
 
-		err = handleLeaveRoomRequest(leaveFroomMessage)
+		err = handleLeaveRoomRequest(leaveRoomMessage)
 		if err != nil {
-			logging.Log("Failed to handle LeaveFroom for reason %s:", err.Error())
+			logging.Log("Failed to handle LeaveRoom for reason %s:", err.Error())
 		}
-		logging.Log("Successfully handled LeaveFroom for player %s", util.FormatIPPort(leaveFroomMessage.ip, leaveFroomMessage.port))
+		logging.Log("Successfully handled LeaveRoom for player %s", util.FormatIPPort(leaveRoomMessage.ip, leaveRoomMessage.port))
 
 	default:
 		logging.Log("Received Unknown Request %d from wfc-server of length %d", requestType, len(msg))

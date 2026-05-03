@@ -10,8 +10,8 @@ import (
 	"mkw-server/util"
 )
 
-// Id: JoinFroom (0x01)
-type JoinFroomMessage struct {
+// Id: JoinRoom (0x01)
+type JoinRoomMessage struct {
 	ip       uint32
 	port     uint16
 	aid      uint8
@@ -19,17 +19,17 @@ type JoinFroomMessage struct {
 	searchId uint64
 }
 
-// Id: JoinFroom (0x01)
-type JoinFroomResp struct {
+// Id: JoinRoom (0x01)
+type JoinRoomResp struct {
 	searchId uint64
 }
 
-func unpackJoinFroomMessage(msg []byte) (*JoinFroomMessage, error) {
+func unpackJoinRoomMessage(msg []byte) (*JoinRoomMessage, error) {
 	if len(msg) != 16 {
-		return nil, fmt.Errorf("Unable to unpack JoinFroomMessage! len(msg) != 16 (%d)", len(msg))
+		return nil, fmt.Errorf("Unable to unpack JoinRoomMessage! len(msg) != 16 (%d)", len(msg))
 	}
 
-	return &JoinFroomMessage{
+	return &JoinRoomMessage{
 		ip:       binary.BigEndian.Uint32(msg[0:4]),
 		port:     binary.BigEndian.Uint16(msg[4:6]),
 		aid:      uint8(msg[6]),
@@ -41,13 +41,13 @@ func unpackJoinFroomMessage(msg []byte) (*JoinFroomMessage, error) {
 func packResponce(searchId uint64) []byte {
 	b := make([]byte, 9)
 
-	b[0] = JoinFroom
+	b[0] = JoinRoom
 	binary.BigEndian.PutUint64(b[1:], searchId)
 	return b
 }
 
 // addr is the address of the client that wants to join the room
-func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) error {
+func handleJoinRoomMessage(newPlayerMsg *JoinRoomMessage) error {
 	if newPlayerMsg == nil {
 		return errors.New("newPlayerMsg is nil!")
 	}
@@ -66,7 +66,7 @@ func handleJoinFroomMessage(newPlayerMsg *JoinFroomMessage) error {
 		return fmt.Errorf(err.Error())
 	}
 
-	logging.Log("Successfully added player to room! Current player count is", core.GetCurrentPlayerCount())
+	logging.Log("Successfully added player to room! Current player count is %d", core.GetCurrentPlayerCount())
 
 	err = SendToWFC(packResponce(newPlayerMsg.searchId))
 	if err != nil {

@@ -9,7 +9,6 @@ import (
 
 	"mkw-server/controller"
 	"mkw-server/logging"
-	"mkw-server/settings"
 	"mkw-server/talker"
 )
 
@@ -17,8 +16,6 @@ import (
 // created in wfc-server when it matches two players, well before players are notified they're
 // in a group. mkw-server has time to setup and start listeners before players are notified
 func main() {
-	settings.InitDefaultSettings()
-
 	err := logging.InitLogFile(talker.SendMessageToWFC)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logging: %v\n", err)
